@@ -1,0 +1,2 @@
+# Generate gRPC client/server code and Protocol Buffers serialization code from .proto file
+protoc --grpc_out=.\generated --cpp_out=.\generated --plugin=protoc-gen-grpc=C:\Users\julie\Desktop\All\Important\Programmation\Tools\grpc\.build\Release\grpc_cpp_plugin.exe .\proto\trading_engine.proto

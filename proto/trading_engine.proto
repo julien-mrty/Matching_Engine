@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+message Order {
+  string order_id = 1;
+  string client_id = 2;
+  double price = 3;
+  int32 quantity = 4;
+  enum Side { BUY = 0; SELL = 1; }
+  Side side = 5;
+}
+
+message MarketDataRequest {
+  string symbol = 1;
+}
+
+service TradingEngine {
+  rpc SubmitOrder (OrderRequest) returns (OrderResponse);
+  rpc GetOrderBook (OrderBookRequest) returns (OrderBookResponse);
+  rpc StreamMarketData (MarketDataRequest) returns (stream MarketDataUpdate);
+}
+
+message OrderRequest {
+  string client_id = 1;
+  string symbol = 2;
+  enum OrderType { LIMIT = 0; MARKET = 1; }
+  OrderType order_type = 3;
+  enum Side { BUY = 0; SELL = 1; }
+  Side side = 4;
+  double price = 5;
+  int32 quantity = 6;
+}
+
+message OrderResponse {
+  string order_id = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message OrderBookRequest {
+  string symbol = 1;
+}
+
+message OrderBookResponse {
+  repeated Order bids = 1;
+  repeated Order asks = 2;
+}
+
+message MarketDataUpdate {
+  string symbol = 1;
+  double best_bid = 2;
+  double best_ask = 3;
+  int32 bid_size = 4;
+  int32 ask_size = 5;
+}
