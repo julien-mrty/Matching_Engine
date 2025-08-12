@@ -1,1 +1,36 @@
+# CMake / build trees
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+*.cmake
+!CMakeLists.txt
+compile_commands.json
+install_manifest.txt
+CTestTestfile.cmake
+Makefile
+
+# Objects & binaries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.pdb
+
+# IDE
 .vscode/
+.vs/
+*.user
+Debug/
+Release/
+RelWithDebInfo/
+MinSizeRel/
+x64/
+x86/
+ipch/

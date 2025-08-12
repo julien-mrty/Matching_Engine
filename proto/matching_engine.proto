@@ -13,7 +13,7 @@ message MarketDataRequest {
   string symbol = 1;
 }
 
-service TradingEngine {
+service MatchingEngine {
   rpc SubmitOrder (OrderRequest) returns (OrderResponse);
   rpc GetOrderBook (OrderBookRequest) returns (OrderBookResponse);
   rpc StreamMarketData (MarketDataRequest) returns (stream MarketDataUpdate);

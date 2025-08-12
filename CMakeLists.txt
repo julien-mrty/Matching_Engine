@@ -1,38 +1,45 @@
-cmake_minimum_required(VERSION 3.31)
-project(TradingEngine)
+cmake_minimum_required(VERSION 3.20)
+project(matching_engine LANGUAGES CXX)
 
-# 1. Basic setup
-set(CMAKE_CXX_STANDARD 17)
+# Use C++20
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# 1) Find packages provided by vcpkg (you pass the toolchain at configure time)
+find_package(Protobuf CONFIG REQUIRED)
+find_package(gRPC CONFIG REQUIRED)
 
-# 2. Find required packages
-set(Protobuf_ROOT "C:/Program Files/Protobuf")
-find_package(Protobuf REQUIRED)
+# 2) Where the .proto lives and where generated code should go
+set(PROTO ${CMAKE_SOURCE_DIR}/proto/matching_engine.proto)
+set(GEN   ${CMAKE_BINARY_DIR}/generated)
+file(MAKE_DIRECTORY ${GEN})
 
-set(gRPC_ROOT "C:/Users/julie/Desktop/All/Important/Programmation/Tools/grpc/.build/Release")
-find_package(gRPC REQUIRED)
-
-# 3. Generate gRPC/protobuf files
-set(PROTO_FILE proto/trading_engine.proto)
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILE})
-grpc_generate_cpp(GRPC_SRCS GRPC_HDRS ${PROTO_FILE})
-
-# 4. Create server executable
-add_executable(server
-    src/server/main.cpp
-    src/server/engine_impl.cpp
-    ${PROTO_SRCS} ${PROTO_HDRS}
-    ${GRPC_SRCS} ${GRPC_HDRS}
+# 3) Run protoc + gRPC C++ plugin to generate sources (create *.pb.cc/h and *.grpc.pb.cc/h)
+add_custom_command(
+  OUTPUT  ${GEN}/matching_engine.pb.cc        ${GEN}/matching_engine.pb.h
+          ${GEN}/matching_engine.grpc.pb.cc   ${GEN}/matching_engine.grpc.pb.h
+  COMMAND protobuf::protoc
+  ARGS --proto_path=${CMAKE_SOURCE_DIR}/proto
+       --cpp_out=${GEN}
+       --grpc_out=${GEN}
+       --plugin=protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>
+       ${PROTO}
+  DEPENDS ${PROTO} protobuf::protoc gRPC::grpc_cpp_plugin
+  COMMENT "Generating C++ from ${PROTO}"
 )
 
-# 5. Link dependencies
-target_link_libraries(server
-    gRPC::grpc++
-    protobuf::libprotobuf
+# 4) Library that wraps the generated code (headers are in ${GEN})
+add_library(proto_lib STATIC
+  ${GEN}/matching_engine.pb.cc
+  ${GEN}/matching_engine.grpc.pb.cc
 )
+target_include_directories(proto_lib PUBLIC ${GEN})
+# link against the vcpkg-provided imported targets
+target_link_libraries(proto_lib PUBLIC gRPC::grpc++ protobuf::libprotobuf)
 
-# 6. Include generated files directory
-target_include_directories(server PRIVATE
-    ${CMAKE_CURRENT_BINARY_DIR}
-)
+# 5) Server and client executables that link the generated library
+add_executable(server src/server/server.cpp)
+target_link_libraries(server PRIVATE proto_lib gRPC::grpc++ protobuf::libprotobuf)
+
+add_executable(client src/client/client.cpp)
+target_link_libraries(client PRIVATE proto_lib gRPC::grpc++ protobuf::libprotobuf)
