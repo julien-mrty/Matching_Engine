@@ -1,96 +1,135 @@
-# Matching_Engine
+# Matching Engine
 
+## Why & How to Install vcpkg, Protobuf, and gRPC (C++)
 
-## Why & How to install vcpkg, Protobuf, and gRPC (C++)
-### Why these tools?
-vcpkg: a C/C++ package manager that installs libraries (headers, libs, tools) and plugs them into CMake automatically. No manual path juggling.
+### Why These Tools?
+- **vcpkg**: A C/C++ package manager that installs libraries (headers, libs, tools) and plugs them into CMake automatically. No manual path juggling.  
+- **Protobuf**: Schema + code generation for messages. Provides `protoc` and the `libprotobuf` runtime.  
+- **gRPC**: RPC framework built on HTTP/2 that uses Protobuf messages. Provides `grpc++` libraries and the codegen plugin.  
 
-Protobuf: schema + codegen for messages. Gives you protoc and the libprotobuf runtime.
+Using vcpkg avoids common Windows issues: missing headers, wrong ABIs, and CMake not finding packages.
 
-gRPC: RPC framework built on HTTP/2 that uses Protobuf messages. Gives you grpc++ libs and the codegen plugin.
+---
 
-Using vcpkg avoids common Windows pain: missing headers, wrong ABIs, and CMake not finding packages.
+## Windows Quickstart (VS 2022)
 
-## Windows quickstart (VS 2022)
-1) Prereqs
-Visual Studio 2022 (Desktop C++ workload)
+### 1 Prerequisites
+- Visual Studio 2022 (**Desktop C++** workload)
+- CMake ≥ 3.20
+- Git, PowerShell
 
-CMake ≥ 3.20
-
-Git, PowerShell
-
-2) Install vcpkg + libs
-powershell
+### 2 Install vcpkg + Libraries
 git clone https://github.com/microsoft/vcpkg C:\vcpkg
 C:\vcpkg\bootstrap-vcpkg.bat
-
 C:\vcpkg\vcpkg.exe install protobuf:x64-windows grpc:x64-windows
 
-
-3) Configure your CMake project (with vcpkg toolchain)
-powershell
+### 3 Configure Your CMake Project (with vcpkg Toolchain)
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
   -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
-  -DVCPKG_TARGET_TRIPLET=x64-windows -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release -j
-OR
-cmake --build build --config Debug -j
+  -DVCPKG_TARGET_TRIPLET=x64-windows 
+  -DCMAKE_BUILD_TYPE=Release
 
+#### Why These Flags?
 
-4) Minimal CMake usage inside your project
-cmake
+##### Visual Studio generator (`-G "Visual Studio 17 2022" -A x64`)
+Generates a VS solution/projects for 64-bit. VS is multi-config: choose Debug/Release at build time.
 
- #CMakeLists.txt
-cmake_minimum_required(VERSION 3.20)
-project(matching_engine LANGUAGES CXX)
-set(CMAKE_CXX_STANDARD 20)
+##### Toolchain file (`-DCMAKE_TOOLCHAIN_FILE=...vcpkg.cmake`)
+Integrates vcpkg so `find_package(Protobuf gRPC)` gets headers, libs, `protoc`, and the gRPC plugin automatically.
 
-find_package(Protobuf CONFIG REQUIRED)
-find_package(gRPC CONFIG REQUIRED)
+##### Triplet (`-DVCPKG_TARGET_TRIPLET=x64-windows`)
+Ensures vcpkg selects binaries matching `-A x64`.
 
-set(PROTO ${CMAKE_SOURCE_DIR}/proto/oms.proto)
-set(GEN   ${CMAKE_BINARY_DIR}/generated)
-file(MAKE_DIRECTORY ${GEN})
+##### Build type (`-DCMAKE_BUILD_TYPE=Release`)
+Hint for single-config generators; harmless here. With VS you still pass `--config Release` when building.
 
-add_custom_command(
-  OUTPUT  ${GEN}/oms.pb.cc ${GEN}/oms.pb.h
-          ${GEN}/oms.grpc.pb.cc ${GEN}/oms.grpc.pb.h
-  COMMAND protobuf::protoc
-  ARGS --proto_path=${CMAKE_SOURCE_DIR}/proto
-       --cpp_out=${GEN}
-       --grpc_out=${GEN}
-       --plugin=protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>
-       ${PROTO}
-  DEPENDS ${PROTO} protobuf::protoc gRPC::grpc_cpp_plugin
-)
+---
 
-add_library(proto_lib STATIC
-  ${GEN}/oms.pb.cc
-  ${GEN}/oms.grpc.pb.cc
-)
-target_include_directories(proto_lib PUBLIC ${GEN})
-target_link_libraries(proto_lib PUBLIC gRPC::grpc++ protobuf::libprotobuf)
-Verify it worked
-powershell
-Copy
-Edit
-where protoc
-# -> C:\vcpkg\installed\x64-windows\tools\protobuf\protoc.exe
+**Note:**  
+- PowerShell line continuation uses the backtick `` ` ``.  
+- In **cmd.exe** use `^`.  
+- In **bash** use `\`.
 
-# Rebuild your project
-cmake --build build --config Release -j
-Troubleshooting (super short)
-Clean reconfigure after changing toolchain/triplet: delete build/ and run CMake again.
+---
 
-Config mismatch: with VS generator, pass --config Debug/Release when building.
+# Build (Generate Protobuf/gRPC Code + Compile)
 
-Arch mismatch: keep everything x64 (-A x64, triplet x64-windows).
+**Generate code & build the proto library:**
+```bash
+cmake --build build --target proto_lib --config Release -j
+```
 
-macOS / Linux (alternatives)
-macOS (Homebrew): brew install cmake protobuf grpc
+**Build the apps:**
+```bash
+cmake --build build --target server --config Release -j
+cmake --build build --target client --config Release -j
+```
 
-Ubuntu (apt): sudo apt install cmake protobuf-compiler libprotobuf-dev libgrpc++-dev
+##### Target: `proto_lib`
+Building this target triggers the **protoc + gRPC codegen step** (creates `*.pb.cc/.h` and `*.grpc.pb.cc/.h`).  
+Building **server** or **client** also triggers it (they link `proto_lib`).
 
-Or use vcpkg with triplets: x64-osx, x64-linux, same CMake toolchain flow.
+##### `--config Release`
+Required with Visual Studio solutions to pick the configuration.
 
-TL;DR: Install with vcpkg, point CMake to the vcpkg toolchain, find_package(Protobuf gRPC), run Protobuf/gRPC codegen in CMake, and link the imported targets. This keeps your C++ build clean and portable.
+##### `-j`
+Parallel build (uses all cores).
+
+---
+
+# Run (Two Terminals)
+
+**Terminal 1 — server:**
+```bash
+./build/Release/server 0.0.0.0:50051
+```
+
+**Terminal 2 — client:**
+```bash
+./build/Release/client localhost:50051 "ping from client"
+```
+_Output:_
+```
+[client] reply: server echo: ping from client
+```
+
+---
+
+# Common Pitfalls & Quick Fixes
+
+## Missing generated headers (`*.pb.h`, `*.grpc.pb.h`)
+- Build `proto_lib` (or `server`/`client`) to trigger codegen.
+- Check `build/generated/`.
+
+## VS Code squiggles on `<grpcpp/grpcpp.h>`
+Editor can’t see include paths. Add:
+```
+C:\vcpkg\installed\x64-windows\include
+${workspaceFolder}\build\generated
+```
+
+Or set in `.vscode/settings.json`:
+```json
+"C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+"C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json"
+```
+And configure with:
+```bash
+-DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+```
+
+## Config/arch mismatch
+Keep:
+- `-A x64`
+- Triplet `x64-windows`
+- Use `--config Debug|Release` consistently.
+
+## Switching toolchain/triplet
+- Delete `build/`  
+- Re-run **Configure**.
+
+---
+
+# TL;DR
+Install with **vcpkg**, point **CMake** to the vcpkg toolchain, `find_package(Protobuf gRPC)`, run Protobuf/gRPC codegen in CMake, and link the imported targets.  
+This keeps your C++ build **clean** and **portable**.
