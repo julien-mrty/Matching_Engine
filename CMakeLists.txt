@@ -16,8 +16,11 @@ file(MAKE_DIRECTORY ${GEN})
 
 # 3) Run protoc + gRPC C++ plugin to generate sources (create *.pb.cc/h and *.grpc.pb.cc/h)
 add_custom_command(
-  OUTPUT  ${GEN}/matching_engine.pb.cc        ${GEN}/matching_engine.pb.h
-          ${GEN}/matching_engine.grpc.pb.cc   ${GEN}/matching_engine.grpc.pb.h
+  OUTPUT  ${GEN}/matching_engine.pb.cc        
+          ${GEN}/matching_engine.pb.h
+          ${GEN}/matching_engine.grpc.pb.cc   
+          ${GEN}/matching_engine.grpc.pb.h
+          
   COMMAND protobuf::protoc
   ARGS --proto_path=${CMAKE_SOURCE_DIR}/proto
        --cpp_out=${GEN}
