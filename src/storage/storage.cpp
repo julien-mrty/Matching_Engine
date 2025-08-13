@@ -1,6 +1,7 @@
 #include "storage/storage.h"
 
 #include <stdexcept>
+#include <iostream>
 
 // -------------------- ctor / init --------------------
 
@@ -105,7 +106,10 @@ bool Storage::insert_new_order(const std::string& order_id,
     stmt.exec();
     txn.commit();
     return true;
-  } catch (const std::exception&) {
+  } catch (const SQLite::Exception& e) {
+    std::cerr << "[storage] insert_new_order failed: " << e.what()
+              << " code=" << e.getErrorCode()
+              << " ext="  << e.getExtendedErrorCode() << "\n";
     return false;
   }
 }
@@ -202,5 +206,21 @@ std::optional<int64_t> Storage::best_ask(const std::string& symbol) const
     return std::nullopt;
   } catch (const std::exception&) {
     return std::nullopt;
+  }
+}
+
+uint64_t Storage::load_next_oid_seq() const {
+  try {
+    // order_id format assumed: "OID-<number>"
+    SQLite::Statement q(db_,
+      "SELECT COALESCE(MAX(CAST(SUBSTR(order_id, 5) AS INTEGER)), 0) + 1 "
+      "FROM orders WHERE order_id LIKE 'OID-%'");
+    q.executeStep(); // aggregate returns one row
+    return static_cast<uint64_t>(q.getColumn(0).getInt64());
+  } catch (const SQLite::Exception& e) {
+    std::cerr << "[storage] load_next_oid_seq failed: " << e.what()
+              << " code=" << e.getErrorCode()
+              << " ext="  << e.getExtendedErrorCode() << "\n";
+    return 1; // safe fallback
   }
 }

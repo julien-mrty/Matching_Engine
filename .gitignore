@@ -34,3 +34,16 @@ MinSizeRel/
 x64/
 x86/
 ipch/
+
+# SQLite runtime DB files
+/db/*.db
+/db/*.sqlite
+/db/*.sqlite3
+/db/*-wal
+/db/*-shm
+/db/*-journal
+
+# Keep the folder but not its contents
+/db/*
+!/db/.gitkeep
+!/db/README.md

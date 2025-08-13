@@ -28,6 +28,8 @@ public:
   // PRAGMAs + schema creation.
   void init();
 
+  uint64_t load_next_oid_seq() const;
+
   // Insert a new order in state NEW (status=0) with remaining_quantity=quantity.
   // price is nullable for MARKET orders (pass std::nullopt).
   bool insert_new_order(const std::string& order_id,

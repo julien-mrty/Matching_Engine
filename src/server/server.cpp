@@ -30,53 +30,97 @@ public:
     explicit MatchingEngineServiceImpl(std::string db_path)
         : storage_(std::move(db_path)), next_id_(1) {
         storage_.init();
+        // Seed next_id_ so we don't collide with existing rows
+        next_id_.store(storage_.load_next_oid_seq(), std::memory_order_relaxed);
     }
 
     // RPC: SubmitOrder(OrderRequest) -> OrderResponse
-    grpc::Status SubmitOrder(grpc::ServerContext*,
-                       const mat_eng::OrderRequest* req,
-                       mat_eng::OrderResponse* resp) override {
-        // Validation 
+    grpc::Status SubmitOrder(grpc::ServerContext* ctx, const mat_eng::OrderRequest* req, 
+                             mat_eng::OrderResponse* resp) override {
+
+        const auto t0   = std::chrono::steady_clock::now();
+        const auto peer = ctx ? ctx->peer() : "unknown";
+
+        auto side_str = [req]() {
+            return (req->side() == mat_eng::OrderRequest::BUY) ? "BUY" : "SELL";
+        };
+        auto type_str = [req]() {
+            return (req->order_type() == mat_eng::OrderRequest::LIMIT) ? "LIMIT" : "MARKET";
+        };
+
+        // --- log ----------------------------------------------------------------
+        std::cout << "[SubmitOrder] ================================================================= New Order" << std::endl
+                << " client_id=" << req->client_id()
+                << " symbol="    << req->symbol()
+                << " side="      << side_str()
+                << " type="      << type_str()
+                << " price="     << ((req->order_type() == mat_eng::OrderRequest::LIMIT)
+                                        ? std::to_string(req->price())
+                                        : std::string("NULL"))
+                << " scale="     << req->scale()
+                << " qty="       << req->quantity()
+                << std::endl;
+
+        // --- validation ---------------------------------------------------------
         if (req->symbol().empty()) {
             resp->set_success(false);
             resp->set_error_message("symbol is required");
+            std::cerr << "[SubmitOrder][reject] reason=missing_symbol" << std::endl;
             return grpc::Status::OK;
         }
         if (req->quantity() <= 0) {
             resp->set_success(false);
             resp->set_error_message("quantity must be > 0");
+            std::cerr << "[SubmitOrder][reject] reason=non_positive_qty qty=" << req->quantity() << std::endl;
             return grpc::Status::OK;
         }
         if (req->order_type() == mat_eng::OrderRequest::LIMIT && req->price() <= 0) {
             resp->set_success(false);
             resp->set_error_message("price must be > 0 for LIMIT");
+            std::cerr << "[SubmitOrder][reject] reason=non_positive_price price=" << req->price() << std::endl;
             return grpc::Status::OK;
         }
 
         const auto oid = gen_order_id();
+        std::cout << "[SubmitOrder] oid=" << oid << " validated" << std::endl;
 
         const auto now_ms = static_cast<int64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count());
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count());
 
-        // Serialize writes; SQLite is single-writer-friendly
-        std::lock_guard<std::mutex> lk(write_mu_);
-        const bool ok = storage_.insert_new_order(
-            oid,
-            req->client_id(), req->symbol(),
-            static_cast<int>(req->side()),
-            static_cast<int>(req->order_type()),
-            (req->order_type() == mat_eng::OrderRequest::LIMIT)
-                ? std::optional<int64_t>(req->price())
-                : std::nullopt,
-            req->scale(), 
-            req->quantity(), 
-            now_ms
-        );
+        // --- DB write -----------------------------------------------------------
+        bool ok = false;
+        {
+            std::lock_guard<std::mutex> lk(write_mu_); // serialize writes to SQLite
+            ok = storage_.insert_new_order(
+                oid,
+                req->client_id(),
+                req->symbol(),
+                static_cast<int>(req->side()),
+                static_cast<int>(req->order_type()),
+                (req->order_type() == mat_eng::OrderRequest::LIMIT)
+                    ? std::optional<int64_t>(req->price())
+                    : std::nullopt,
+                req->scale(),
+                req->quantity(),
+                now_ms
+            );
+        }
 
+        // --- response & outcome log --------------------------------------------
         resp->set_order_id(oid);
         resp->set_success(ok);
-        if (!ok) resp->set_error_message("DB insert failed");
+        if (!ok) {
+            resp->set_error_message("DB insert failed");
+            std::cerr << "[SubmitOrder][error] oid=" << oid << " outcome=db_insert_failed" << std::endl;
+        } else {
+            std::cout << "[SubmitOrder][ok] oid=" << oid << " inserted" << std::endl;
+        }
+
+        const auto dur_us = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - t0).count();
+        std::cout << "[SubmitOrder] oid=" << oid << " done in " << dur_us << "us" << std::endl;
+
         return grpc::Status::OK;
     }
 
@@ -118,7 +162,6 @@ private:
 
 int main(int argc, char** argv) {
     std::string addr = "0.0.0.0:50051"; // 0.0.0.0 listens on all local interfaces
-    std::string seed_symbol = "SYM";
 
     // Parse command line and flags
     for (int i = 1; i < argc; ++i) {
@@ -138,20 +181,21 @@ int main(int argc, char** argv) {
 
         int selected_port = 0;
         builder.AddListeningPort(addr, grpc::InsecureServerCredentials(), &selected_port);
-        if (selected_port == 0) {
-        std::cerr << "[server] ERROR: failed to bind " << addr << " (in use or permission issue)\n";
-        return 1;
-        }
 
         builder.RegisterService(&service);
         std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
+
         if (!server) {
-        std::cerr << "[server] ERROR: BuildAndStart() returned null\n";
-        return 1;
+            std::cerr << "[server] ERROR: BuildAndStart() returned null\n";
+            return 1;
+        }
+                
+        if (selected_port == 0) {
+            std::cerr << "[server] ERROR: failed to bind " << addr << " (in use or permission issue)\n";
+            return 1;
         }
 
-        std::cout << "[server] listening on " << addr
-                << " ; db=" << db_file.string() << "\n";
+        std::cout << "[server] listening on " << addr << " ; db=" << db_file.string() << "\n";
 
         std::signal(SIGINT,  on_signal);
         std::signal(SIGTERM, on_signal);
