@@ -32,6 +32,8 @@ add_custom_command(
 )
 
 # 4) Library that wraps the generated code (headers are in ${GEN})
+# creates the custom commands (proto_lib) that know how to run protoc and 
+# where to put the generated .pb.cc/.grpc.pb.cc.
 add_library(proto_lib STATIC
   ${GEN}/matching_engine.pb.cc
   ${GEN}/matching_engine.grpc.pb.cc

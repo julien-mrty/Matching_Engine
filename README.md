@@ -26,7 +26,7 @@ C:\vcpkg\vcpkg.exe install protobuf:x64-windows grpc:x64-windows
 ### 3 Configure Your CMake Project (with vcpkg Toolchain)
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
   -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
-  -DVCPKG_TARGET_TRIPLET=x64-windows 
+  -DVCPKG_TARGET_TRIPLET=x64-windows `
   -DCMAKE_BUILD_TYPE=Release
 
 #### Why These Flags?
@@ -54,12 +54,18 @@ Hint for single-config generators; harmless here. With VS you still pass `--conf
 
 # Build (Generate Protobuf/gRPC Code + Compile)
 
+**Generate code & build for everything:**
+```bash
+cmake --build build --config Release -j
+```
+
 **Generate code & build the proto library:**
 ```bash
 cmake --build build --target proto_lib --config Release -j
 ```
 
 **Build the apps:**
+Building server or client will automatically build proto_lib first beacause they have target_link_libraries(server PRIVATE proto_lib) in CmakeLists.txt
 ```bash
 cmake --build build --target server --config Release -j
 cmake --build build --target client --config Release -j
@@ -86,11 +92,19 @@ Parallel build (uses all cores).
 
 **Terminal 2 — client:**
 ```bash
-./build/Release/client localhost:50051 "ping from client"
+./build/Release/client.exe localhost:50051 C1 SYM BUY LIMIT 10050 2 10
 ```
 _Output:_
 ```
-[client] reply: server echo: ping from client
+[client] accepted order_id=1
+```
+
+```bash
+./build/Release/client.exe localhost:50051 C2 SYM SELL MARKET 0 0 5
+```
+_Output:_
+```
+[client] accepted order_id=2
 ```
 
 ---

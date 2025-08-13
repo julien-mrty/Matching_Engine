@@ -1,12 +1,15 @@
 syntax = "proto3";
 
+package matching_engine.v1;
+
 message Order {
   string order_id = 1;
   string client_id = 2;
-  double price = 3;
-  int32 quantity = 4;
+  int64 price = 3; // scaled integer
+  int32 scale = 4; // number of decimal places: 4 => 0.0001
+  int32 quantity = 5;
   enum Side { BUY = 0; SELL = 1; }
-  Side side = 5;
+  Side side = 6;
 }
 
 message MarketDataRequest {
@@ -26,8 +29,9 @@ message OrderRequest {
   OrderType order_type = 3;
   enum Side { BUY = 0; SELL = 1; }
   Side side = 4;
-  double price = 5;
-  int32 quantity = 6;
+  int64 price = 5; // scaled integer
+  int32 scale = 6; // number of decimal places: 4 => 0.0001
+  int32 quantity = 7;
 }
 
 message OrderResponse {

@@ -1,31 +1,58 @@
 #include <grpcpp/grpcpp.h>
-#include "matching_engine.grpc.pb.h"  // generated
-#include "matching_engine.pb.h"       // generated (for te::Ping)
+#include "matching_engine.grpc.pb.h"
+#include "matching_engine.pb.h"
 #include <iostream>
 #include <memory>
 #include <string>
 
+namespace mat_eng = matching_engine::v1; // alias for brevity
+
+static void usage(const char* prog) {
+    std::cerr <<
+      "Usage:\n"
+      "  " << prog << " <addr> <client_id> <symbol> <BUY|SELL> <LIMIT|MARKET> <price> <scale> <qty>\n"
+      "  Example:\n"
+      "  " << prog << " localhost:50051 C1 SYM BUY LIMIT 10050 2 10\n"
+      "  " << prog << " localhost:50051 C2 SYM SELL MARKET 0 0 25\n";
+}
+
 int main(int argc, char** argv) {
-  // Args: <addr> [message]
-  std::string addr   = (argc > 1) ? argv[1] : "localhost:50051";
-  std::string prompt = (argc > 2) ? argv[2] : "hello";
+    if (argc < 9) { usage(argv[0]); return 1; }
 
-  auto channel = grpc::CreateChannel(addr, grpc::InsecureChannelCredentials());
-  std::unique_ptr<te::TradingEngine::Stub> stub = te::TradingEngine::NewStub(channel);
+    std::string addr     = argv[1];
+    std::string clientId = argv[2];
+    std::string symbol   = argv[3];
+    std::string sSide    = argv[4];
+    std::string sType    = argv[5];
+    int         price    = std::stoi(argv[6]);
+    int         scale    = std::stoi(argv[7]);
+    int         qty      = std::stoi(argv[8]);
 
-  te::Ping req;
-  req.set_msg(prompt);
+    // InsecureServerCredentials() is fine for local dev. For anything else, switch to TLS
+    auto channel = grpc::CreateChannel(addr, grpc::InsecureChannelCredentials());
+    std::unique_ptr<mat_eng::MatchingEngine::Stub> stub = mat_eng::MatchingEngine::NewStub(channel);
 
-  grpc::ClientContext ctx;                // you can set deadlines/metadata here
-  te::Ping resp;
-  grpc::Status status = stub->Say(&ctx, req, &resp);
+    mat_eng::OrderRequest req;
+    req.set_client_id(clientId);
+    req.set_symbol(symbol);
+    req.set_side( (sSide == "BUY") ? mat_eng::OrderRequest::BUY : mat_eng::OrderRequest::SELL );
+    req.set_order_type( (sType == "LIMIT") ? mat_eng::OrderRequest::LIMIT : mat_eng::OrderRequest::MARKET );
+    req.set_price(price);
+    req.set_scale(scale);
+    req.set_quantity(qty);
 
-  if (!status.ok()) {
-    std::cerr << "[client] RPC failed: " << status.error_code()
-              << " - " << status.error_message() << "\n";
-    return 1;
-  }
+    grpc::ClientContext ctx;
+    mat_eng::OrderResponse resp;
+    grpc::Status status = stub->SubmitOrder(&ctx, req, &resp);
 
-  std::cout << "[client] reply: " << resp.msg() << "\n";
-  return 0;
+    if (!status.ok()) {
+        std::cerr << "[client] RPC failed: " << status.error_code() << " - " << status.error_message() << "\n";
+        return 2;
+    }
+    if (!resp.success()) {
+        std::cerr << "[client] rejected: " << resp.error_message() << "\n";
+        return 3;
+    }
+    std::cout << "[client] accepted order_id=" << resp.order_id() << "\n";
+    return 0;
 }
