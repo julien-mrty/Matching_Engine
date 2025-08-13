@@ -44,7 +44,28 @@ target_link_libraries(proto_lib PUBLIC gRPC::grpc++ protobuf::libprotobuf)
 
 # 5) Server and client executables that link the generated library
 add_executable(server src/server/server.cpp)
-target_link_libraries(server PRIVATE proto_lib gRPC::grpc++ protobuf::libprotobuf)
+target_link_libraries(server PRIVATE proto_lib storage gRPC::grpc++ protobuf::libprotobuf)
 
 add_executable(client src/client/client.cpp)
-target_link_libraries(client PRIVATE proto_lib gRPC::grpc++ protobuf::libprotobuf)
+target_link_libraries(client PRIVATE proto_lib storage gRPC::grpc++ protobuf::libprotobuf)
+
+# --- SQLiteCpp
+find_package(SQLiteCpp CONFIG REQUIRED)
+
+# Your storage library (adjust paths as needed)
+add_library(storage STATIC
+  src/storage/storage.cpp
+)
+target_include_directories(storage
+  PUBLIC ${CMAKE_SOURCE_DIR}/include
+)
+target_compile_features(storage PUBLIC cxx_std_20)
+target_link_libraries(storage
+  PRIVATE SQLiteCpp
+  # If your toolchain complains about unresolved sqlite3 symbols, also add:
+  # PRIVATE unofficial::sqlite3::sqlite3
+)
+
+# Link storage into your binaries
+target_link_libraries(server PRIVATE storage)
+target_link_libraries(client PRIVATE storage)

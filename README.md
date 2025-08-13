@@ -22,6 +22,7 @@ Using vcpkg avoids common Windows issues: missing headers, wrong ABIs, and CMake
 git clone https://github.com/microsoft/vcpkg C:\vcpkg
 C:\vcpkg\bootstrap-vcpkg.bat
 C:\vcpkg\vcpkg.exe install protobuf:x64-windows grpc:x64-windows
+C:\vcpkg\vcpkg.exe install sqlitecpp
 
 ### 3 Configure Your CMake Project (with vcpkg Toolchain)
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `

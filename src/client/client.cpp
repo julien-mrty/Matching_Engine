@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-namespace mat_eng = matching_engine::v1; // alias for brevity
+namespace mat_eng = matching_engine::v1;
 
 static void usage(const char* prog) {
     std::cerr <<

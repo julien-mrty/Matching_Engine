@@ -20,6 +20,8 @@ service MatchingEngine {
   rpc SubmitOrder (OrderRequest) returns (OrderResponse);
   rpc GetOrderBook (OrderBookRequest) returns (OrderBookResponse);
   rpc StreamMarketData (MarketDataRequest) returns (stream MarketDataUpdate);
+  // Client subscribes to receive updates about its own orders
+  rpc StreamOrderUpdates(OrderUpdatesRequest) returns (stream OrderUpdate);
 }
 
 message OrderRequest {
@@ -51,8 +53,31 @@ message OrderBookResponse {
 
 message MarketDataUpdate {
   string symbol = 1;
-  double best_bid = 2;
-  double best_ask = 3;
-  int32 bid_size = 4;
-  int32 ask_size = 5;
+  int64 best_bid = 2;
+  int64 best_ask = 3;
+  int32 scale = 4;
+  int32 bid_size = 5;
+  int32 ask_size = 6;
+}
+
+message OrderUpdatesRequest {
+  string client_id = 1;  // identify who we’re interested in
+}
+
+message OrderUpdate {
+  string order_id = 1;
+  string client_id = 2;
+  string symbol = 3;
+  enum Status {
+    NEW = 0;
+    PARTIALLY_FILLED = 1;
+    FILLED = 2;
+    CANCELED = 3;
+    REJECTED = 4;
+  }
+  Status status = 4;
+  int64 fill_price = 5;
+  int32 scale = 6;
+  int32 fill_quantity = 7;
+  int32 remaining_quantity = 8;
 }
