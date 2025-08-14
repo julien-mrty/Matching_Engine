@@ -1,4 +1,4 @@
-#include "storage/storage.h"
+#include "storage/storage.hpp"
 
 #include <stdexcept>
 #include <iostream>
@@ -23,54 +23,62 @@ void Storage::init() {
 }
 
 void Storage::create_schema_() {
+  // -------------------------- Tables --------------------------
   db_.exec(R"SQL(
-CREATE TABLE IF NOT EXISTS orders (
-  order_id            TEXT PRIMARY KEY,
-  client_id           TEXT NOT NULL,
-  symbol              TEXT NOT NULL,
-  side                INTEGER NOT NULL,        -- 0=BUY, 1=SELL
-  order_type          INTEGER NOT NULL,        -- 0=LIMIT, 1=MARKET
-  price               INTEGER,                 -- nullable (MARKET)
-  scale               INTEGER NOT NULL,
-  quantity            INTEGER NOT NULL,
-  status              INTEGER NOT NULL,        -- 0 NEW, 1 PARTIALLY_FILLED, 2 FILLED, 3 CANCELED, 4 REJECTED
-  remaining_quantity  INTEGER NOT NULL,
-  created_ts          INTEGER NOT NULL,        -- epoch ms
-  updated_ts          INTEGER NOT NULL
-);
-)SQL");
+    CREATE TABLE IF NOT EXISTS orders (
+      order_id            TEXT PRIMARY KEY,
+      client_id           TEXT NOT NULL,
+      symbol              TEXT NOT NULL,
+      side                INTEGER NOT NULL,        -- 0=BUY, 1=SELL
+      order_type          INTEGER NOT NULL,        -- 0=LIMIT, 1=MARKET
+      price               INTEGER,                 -- nullable (MARKET)
+      scale               INTEGER NOT NULL,
+      quantity            INTEGER NOT NULL,
+      status              INTEGER NOT NULL,        -- 0 NEW, 1 PARTIALLY_FILLED, 2 FILLED, 3 CANCELED, 4 REJECTED
+      remaining_quantity  INTEGER NOT NULL,
+      created_ts          INTEGER NOT NULL,        -- epoch ms
+      updated_ts          INTEGER NOT NULL
+    );
+  )SQL");
 
   db_.exec(R"SQL(
-CREATE INDEX IF NOT EXISTS idx_orders_symbol_side
-  ON orders(symbol, side);
-)SQL");
+    CREATE TABLE IF NOT EXISTS fills (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id            TEXT NOT NULL,
+      symbol              TEXT NOT NULL,
+      fill_price          INTEGER NOT NULL,
+      scale               INTEGER NOT NULL,
+      fill_quantity       INTEGER NOT NULL,
+      event_ts            INTEGER NOT NULL,
+      FOREIGN KEY(order_id) REFERENCES orders(order_id)
+    );
+  )SQL");
+
+  // -------------------------- Indexes --------------------------
+  db_.exec(R"SQL(
+    CREATE INDEX IF NOT EXISTS idx_orders_symbol_side
+      ON orders(symbol, side);
+  )SQL");
 
   db_.exec(R"SQL(
-CREATE INDEX IF NOT EXISTS idx_orders_client
-  ON orders(client_id);
-)SQL");
+    CREATE INDEX IF NOT EXISTS idx_orders_client
+      ON orders(client_id);
+  )SQL");
 
   db_.exec(R"SQL(
-CREATE TABLE IF NOT EXISTS fills (
-  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-  order_id            TEXT NOT NULL,
-  symbol              TEXT NOT NULL,
-  fill_price          INTEGER NOT NULL,
-  scale               INTEGER NOT NULL,
-  fill_quantity       INTEGER NOT NULL,
-  event_ts            INTEGER NOT NULL,
-  FOREIGN KEY(order_id) REFERENCES orders(order_id)
-);
-)SQL");
+    CREATE INDEX IF NOT EXISTS idx_fills_order
+      ON fills(order_id);
+  )SQL");
 
   db_.exec(R"SQL(
-CREATE INDEX IF NOT EXISTS idx_fills_order
-  ON fills(order_id);
-)SQL");
+    -- speeds fetching open orders by symbol/side/price
+    CREATE INDEX IF NOT EXISTS idx_orders_open
+      ON orders(symbol, side, price, created_ts)
+      WHERE status IN (0,1); -- NEW, PARTIALLY_FILLED
+  )SQL");
 }
 
 // -------------------- writes --------------------
-
 bool Storage::insert_new_order(const std::string& order_id,
                                const std::string& client_id,
                                const std::string& symbol,
@@ -117,8 +125,7 @@ bool Storage::insert_new_order(const std::string& order_id,
 bool Storage::update_order_status(const std::string& order_id,
                                   int status,
                                   int32_t remaining_qty,
-                                  int64_t now_ms)
-{
+                                  int64_t now_ms) {
   try {
     SQLite::Transaction txn(db_);
     SQLite::Statement stmt(db_,
@@ -137,8 +144,7 @@ bool Storage::update_order_status(const std::string& order_id,
   }
 }
 
-bool Storage::add_fill(const FillRow& f)
-{
+bool Storage::add_fill(const Storage::FillRow& f) {
   try {
     SQLite::Transaction txn(db_);
 
@@ -166,9 +172,7 @@ bool Storage::add_fill(const FillRow& f)
 }
 
 // -------------------- reads --------------------
-
-std::optional<int64_t> Storage::best_bid(const std::string& symbol) const
-{
+std::optional<int64_t> Storage::best_bid(const std::string& symbol) const {
   try {
     SQLite::Statement q(db_,
       "SELECT MAX(price) "

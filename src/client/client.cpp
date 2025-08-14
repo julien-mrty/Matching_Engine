@@ -1,11 +1,11 @@
 #include <grpcpp/grpcpp.h>
-#include "matching_engine.grpc.pb.h"
-#include "matching_engine.pb.h"
+#include "matching_engine_service.grpc.pb.h"
+#include "matching_engine_service.pb.h"
 #include <iostream>
 #include <memory>
 #include <string>
 
-namespace mat_eng = matching_engine::v1;
+namespace mat_eng = matching_engine_service::v1;
 
 static void usage(const char* prog) {
     std::cerr <<
@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
 
     // InsecureServerCredentials() is fine for local dev. For anything else, switch to TLS
     auto channel = grpc::CreateChannel(addr, grpc::InsecureChannelCredentials());
-    std::unique_ptr<mat_eng::MatchingEngine::Stub> stub = mat_eng::MatchingEngine::NewStub(channel);
+    std::unique_ptr<mat_eng::MatchingEngineService::Stub> stub = mat_eng::MatchingEngineService::NewStub(channel);
 
     mat_eng::OrderRequest req;
     req.set_client_id(clientId);

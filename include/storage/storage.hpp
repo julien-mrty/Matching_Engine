@@ -5,16 +5,6 @@
 #include <optional>
 #include <string>
 
-// Row used when recording a fill
-struct FillRow {
-  std::string order_id;
-  std::string symbol;
-  int64_t     fill_price;     // scaled int
-  int32_t     scale;
-  int32_t     fill_quantity;
-  int64_t     event_ts;       // epoch ms
-};
-
 // Lightweight persistence layer backed by SQLite (via SQLiteCpp).
 // Notes:
 //  - Call init() once after construction to set pragmas and create tables.
@@ -24,6 +14,16 @@ public:
   // Opens (or creates) the database file.
   // Thread-safe mode: OPEN_FULLMUTEX; you should still serialize writes at the app level.
   explicit Storage(const std::string& db_path);
+
+  // Row used when recording a fill
+  struct FillRow {
+    int64_t order_id;
+    std::string symbol;
+    int64_t     fill_price;     // scaled int
+    int32_t     scale;
+    int32_t     fill_quantity;
+    int64_t     event_ts;       // epoch ms
+  };
 
   // PRAGMAs + schema creation.
   void init();

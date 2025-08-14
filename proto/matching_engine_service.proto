@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package matching_engine.v1;
+package matching_engine_service.v1;
 
 message Order {
   string order_id = 1;
@@ -16,7 +16,7 @@ message MarketDataRequest {
   string symbol = 1;
 }
 
-service MatchingEngine {
+service MatchingEngineService {
   rpc SubmitOrder (OrderRequest) returns (OrderResponse);
   rpc GetOrderBook (OrderBookRequest) returns (OrderBookResponse);
   rpc StreamMarketData (MarketDataRequest) returns (stream MarketDataUpdate);

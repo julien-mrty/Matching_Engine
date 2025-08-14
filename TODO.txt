@@ -1,0 +1,22 @@
+Main :
+
+Refactor server, client ? Why no include ?
+
+I should set the scale to 4 when receiving an order, convert the price to a scale of 4 whatever the initial scale is.
+
+
+
+
+Other questions :
+
+What is the difference  between uint64_t and int64_t ?
+
+Difference unique_ptr shared_ptr
+
+mutable keyword ?
+
+How mutex works in cpp ? it looks like they are only declared bu never used ? Is you go trough a mutex, go know it can no be two workers on the following at the same time ? or does it required to be locked and unlocked explicitly ?
+
+what are inline function ?
+
+recap on pointers

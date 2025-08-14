@@ -1,6 +1,6 @@
 #include <grpcpp/grpcpp.h>
-#include "matching_engine.grpc.pb.h"
-#include "matching_engine.pb.h"
+#include "matching_engine_service.grpc.pb.h"
+#include "matching_engine_service.pb.h"
 
 #include <unordered_map>
 #include <vector>
@@ -15,18 +15,17 @@
 #include <grpcpp/grpcpp.h>
 #include <atomic>
 #include <csignal>
-#include "storage/storage.h"
+#include "storage/storage.hpp"
 
 using namespace std::chrono_literals;
-namespace mat_eng = matching_engine::v1;
+namespace mat_eng_service = matching_engine_service::v1;
 
 std::atomic<bool> g_stop{false};
 void on_signal(int) { g_stop.store(true, std::memory_order_relaxed); }
 
-class MatchingEngineServiceImpl final : public mat_eng::MatchingEngine::Service {
+class MatchingEngineServiceImpl final : public mat_eng_service::MatchingEngineService::Service {
 public:
-    //MatchingEngineServiceImpl() : next_id_(1) {    }
-    // Main ctor: explicit to prevent accidental implicit conversions
+    // Main constructor: explicit to prevent accidental implicit conversions
     explicit MatchingEngineServiceImpl(std::string db_path)
         : storage_(std::move(db_path)), next_id_(1) {
         storage_.init();
@@ -35,17 +34,17 @@ public:
     }
 
     // RPC: SubmitOrder(OrderRequest) -> OrderResponse
-    grpc::Status SubmitOrder(grpc::ServerContext* ctx, const mat_eng::OrderRequest* req, 
-                             mat_eng::OrderResponse* resp) override {
+    grpc::Status SubmitOrder(grpc::ServerContext* ctx, const mat_eng_service::OrderRequest* req, 
+                             mat_eng_service::OrderResponse* resp) override {
 
         const auto t0   = std::chrono::steady_clock::now();
         const auto peer = ctx ? ctx->peer() : "unknown";
 
         auto side_str = [req]() {
-            return (req->side() == mat_eng::OrderRequest::BUY) ? "BUY" : "SELL";
+            return (req->side() == mat_eng_service::OrderRequest::BUY) ? "BUY" : "SELL";
         };
         auto type_str = [req]() {
-            return (req->order_type() == mat_eng::OrderRequest::LIMIT) ? "LIMIT" : "MARKET";
+            return (req->order_type() == mat_eng_service::OrderRequest::LIMIT) ? "LIMIT" : "MARKET";
         };
 
         // --- log ----------------------------------------------------------------
@@ -54,7 +53,7 @@ public:
                 << " symbol="    << req->symbol()
                 << " side="      << side_str()
                 << " type="      << type_str()
-                << " price="     << ((req->order_type() == mat_eng::OrderRequest::LIMIT)
+                << " price="     << ((req->order_type() == mat_eng_service::OrderRequest::LIMIT)
                                         ? std::to_string(req->price())
                                         : std::string("NULL"))
                 << " scale="     << req->scale()
@@ -74,7 +73,7 @@ public:
             std::cerr << "[SubmitOrder][reject] reason=non_positive_qty qty=" << req->quantity() << std::endl;
             return grpc::Status::OK;
         }
-        if (req->order_type() == mat_eng::OrderRequest::LIMIT && req->price() <= 0) {
+        if (req->order_type() == mat_eng_service::OrderRequest::LIMIT && req->price() <= 0) {
             resp->set_success(false);
             resp->set_error_message("price must be > 0 for LIMIT");
             std::cerr << "[SubmitOrder][reject] reason=non_positive_price price=" << req->price() << std::endl;
@@ -98,7 +97,7 @@ public:
                 req->symbol(),
                 static_cast<int>(req->side()),
                 static_cast<int>(req->order_type()),
-                (req->order_type() == mat_eng::OrderRequest::LIMIT)
+                (req->order_type() == mat_eng_service::OrderRequest::LIMIT)
                     ? std::optional<int64_t>(req->price())
                     : std::nullopt,
                 req->scale(),
@@ -126,8 +125,8 @@ public:
 
     // Minimal implementation for GetOrderBook
     grpc::Status GetOrderBook(grpc::ServerContext*,
-                        const mat_eng::OrderBookRequest* req,
-                        mat_eng::OrderBookResponse* resp) override {
+                        const mat_eng_service::OrderBookRequest* req,
+                        mat_eng_service::OrderBookResponse* resp) override {
 
         // TODO
         return grpc::Status::OK;
@@ -150,10 +149,10 @@ public:
 
 private:
     Storage storage_;                    // long-lived DB handle
-    std::atomic<uint64_t> next_id_;      // starts at 1
+    std::atomic<uint64_t> next_id_;      // starts at db last ID + 1
     std::mutex write_mu_;                // guard write ops
 
-    // Thread-safe monotonic id generator
+    // Thread safe monotonic id generator
     std::string gen_order_id() {
         const uint64_t id = next_id_.fetch_add(1, std::memory_order_relaxed);
         return "OID-" + std::to_string(id);
