@@ -1,5 +1,7 @@
 Main :
 
+Add linter
+
 Refactor server, client ? Why no include ?
 
 I should set the scale to 4 when receiving an order, convert the price to a scale of 4 whatever the initial scale is.
