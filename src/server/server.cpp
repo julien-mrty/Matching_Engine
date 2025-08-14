@@ -1,6 +1,9 @@
 #include <grpcpp/grpcpp.h>
 #include "matching_engine.grpc.pb.h"
 #include "matching_engine.pb.h"
+#include "domain/order.hpp"
+#include "storage/storage.h"
+#include "domain/side.hpp"
 
 #include <unordered_map>
 #include <vector>
@@ -15,7 +18,6 @@
 #include <grpcpp/grpcpp.h>
 #include <atomic>
 #include <csignal>
-#include "storage/storage.h"
 
 using namespace std::chrono_literals;
 namespace mat_eng = matching_engine::v1;
@@ -42,7 +44,7 @@ public:
         const auto peer = ctx ? ctx->peer() : "unknown";
 
         auto side_str = [req]() {
-            return (req->side() == mat_eng::OrderRequest::BUY) ? "BUY" : "SELL";
+            return (req->side() == mat_eng::BUY) ? "BUY" : "SELL";
         };
         auto type_str = [req]() {
             return (req->order_type() == mat_eng::OrderRequest::LIMIT) ? "LIMIT" : "MARKET";
@@ -81,45 +83,40 @@ public:
             return grpc::Status::OK;
         }
 
-        const auto oid = gen_order_id();
-        std::cout << "[SubmitOrder] oid=" << oid << " validated" << std::endl;
+        const auto order_id = gen_order_id();
+        std::cout << "[SubmitOrder] oid=" << order_id << " validated" << std::endl;
 
-        const auto now_ms = static_cast<int64_t>(
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count());
+        // --- Order creation -----------------------------------------------------------
+        Order new_order = Order::FromRaw(
+            order_id,
+            req->client_id(),
+            req->symbol(),
+            req->price(),   // raw price
+            req->scale(),   // raw scale
+            req->quantity(),
+            req->side()
+        );
 
         // --- DB write -----------------------------------------------------------
         bool ok = false;
         {
             std::lock_guard<std::mutex> lk(write_mu_); // serialize writes to SQLite
-            ok = storage_.insert_new_order(
-                oid,
-                req->client_id(),
-                req->symbol(),
-                static_cast<int>(req->side()),
-                static_cast<int>(req->order_type()),
-                (req->order_type() == mat_eng::OrderRequest::LIMIT)
-                    ? std::optional<int64_t>(req->price())
-                    : std::nullopt,
-                req->scale(),
-                req->quantity(),
-                now_ms
-            );
+            ok = storage_.insert_new_order(new_order); 
         }
 
         // --- response & outcome log --------------------------------------------
-        resp->set_order_id(oid);
+        resp->set_order_id(order_id);
         resp->set_success(ok);
         if (!ok) {
             resp->set_error_message("DB insert failed");
-            std::cerr << "[SubmitOrder][error] oid=" << oid << " outcome=db_insert_failed" << std::endl;
+            std::cerr << "[SubmitOrder][error] oid=" << order_id << " outcome=db_insert_failed" << std::endl;
         } else {
-            std::cout << "[SubmitOrder][ok] oid=" << oid << " inserted" << std::endl;
+            std::cout << "[SubmitOrder][ok] oid=" << order_id << " inserted" << std::endl;
         }
 
         const auto dur_us = std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::steady_clock::now() - t0).count();
-        std::cout << "[SubmitOrder] oid=" << oid << " done in " << dur_us << "us" << std::endl;
+        std::cout << "[SubmitOrder] oid=" << order_id << " done in " << dur_us << "us" << std::endl;
 
         return grpc::Status::OK;
     }

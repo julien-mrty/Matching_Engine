@@ -1,4 +1,5 @@
 #include "storage/storage.h"
+#include "domain/side.hpp"
 
 #include <stdexcept>
 #include <iostream>
@@ -28,11 +29,11 @@ CREATE TABLE IF NOT EXISTS orders (
   order_id            TEXT PRIMARY KEY,
   client_id           TEXT NOT NULL,
   symbol              TEXT NOT NULL,
-  side                INTEGER NOT NULL,        -- 0=BUY, 1=SELL
+  side                INTEGER NOT NULLCHECK (side IN (1,2)), -- 1=BUY, 2=SELL (matches proto)
   order_type          INTEGER NOT NULL,        -- 0=LIMIT, 1=MARKET
   price               INTEGER,                 -- nullable (MARKET)
   scale               INTEGER NOT NULL,
-  quantity            INTEGER NOT NULL,
+  quantity            INTEGER NOT NULL CHECK (quantity > 0),
   status              INTEGER NOT NULL,        -- 0 NEW, 1 PARTIALLY_FILLED, 2 FILLED, 3 CANCELED, 4 REJECTED
   remaining_quantity  INTEGER NOT NULL,
   created_ts          INTEGER NOT NULL,        -- epoch ms
@@ -69,19 +70,51 @@ CREATE INDEX IF NOT EXISTS idx_fills_order
 )SQL");
 }
 
-// -------------------- writes --------------------
+// -------------------- time helper --------------------
+inline int64_t now_ms() {
+  using namespace std::chrono;
+  return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+}
 
-bool Storage::insert_new_order(const std::string& order_id,
-                               const std::string& client_id,
-                               const std::string& symbol,
-                               int side,
-                               int order_type,
-                               std::optional<int64_t> price,
-                               int32_t scale,
-                               int32_t quantity,
-                               int64_t now_ms)
-{
+// -------------------- writes --------------------
+bool Storage::insert_new_order(const Order& o) {
   try {
+    SQLite::Transaction txn(db_);
+
+    const int64_t ts = now_ms();
+
+    // If you renamed the column to `price_q4` and removed `scale`
+    SQLite::Statement stmt(db_,
+      "INSERT INTO orders("
+      "  order_id, client_id, symbol, side, order_type,"
+      "  price_q4, quantity, status, remaining_quantity,"
+      "  created_ts, updated_ts"
+      ") VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+
+    stmt.bind(1,  o.order_id);
+    stmt.bind(2,  o.client_id);
+    stmt.bind(3,  o.symbol);
+    stmt.bind(4,  static_cast<int>(o.side));   // proto enum → int
+    stmt.bind(5,  1);                          // order_type=LIMIT (adjust if you support more)
+    stmt.bind(6,  static_cast<long long>(o.price_q4));
+    stmt.bind(7,  static_cast<long long>(o.quantity));
+    stmt.bind(8,  0);                          // status=NEW
+    stmt.bind(9,  static_cast<long long>(o.quantity));
+    stmt.bind(10, static_cast<long long>(ts));
+    stmt.bind(11, static_cast<long long>(ts));
+
+    stmt.exec();
+    txn.commit();
+    return true;
+
+  } catch (const SQLite::Exception& e) {
+    std::cerr << "[storage] insert_new_order failed: " << e.what()
+              << " code=" << e.getErrorCode()
+              << " ext="  << e.getExtendedErrorCode() << "\n";
+    return false;
+  }
+  /*
+    try {
     SQLite::Transaction txn(db_);
     SQLite::Statement stmt(db_,
       "INSERT INTO orders(order_id, client_id, symbol, side, order_type, price, scale, quantity, status, remaining_quantity, created_ts, updated_ts) "
@@ -112,6 +145,8 @@ bool Storage::insert_new_order(const std::string& order_id,
               << " ext="  << e.getExtendedErrorCode() << "\n";
     return false;
   }
+  */
+
 }
 
 bool Storage::update_order_status(const std::string& order_id,

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "domain/order.hpp"
+
 #include <SQLiteCpp/SQLiteCpp.h>
 #include <cstdint>
 #include <optional>
@@ -32,15 +34,7 @@ public:
 
   // Insert a new order in state NEW (status=0) with remaining_quantity=quantity.
   // price is nullable for MARKET orders (pass std::nullopt).
-  bool insert_new_order(const std::string& order_id,
-                        const std::string& client_id,
-                        const std::string& symbol,
-                        int side,                // 0=BUY, 1=SELL
-                        int order_type,          // 0=LIMIT, 1=MARKET
-                        std::optional<int64_t> price,
-                        int32_t scale,
-                        int32_t quantity,
-                        int64_t now_ms);
+  bool insert_new_order(const Order& o);
 
   // Update order status and remaining qty.
   bool update_order_status(const std::string& order_id,

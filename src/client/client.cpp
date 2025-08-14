@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
     std::string symbol   = argv[3];
     std::string sSide    = argv[4];
     std::string sType    = argv[5];
-    int         price    = std::stoi(argv[6]);
+    int64_t     price    = std::stoi(argv[6]);
     int         scale    = std::stoi(argv[7]);
     int         qty      = std::stoi(argv[8]);
 
@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
     mat_eng::OrderRequest req;
     req.set_client_id(clientId);
     req.set_symbol(symbol);
-    req.set_side( (sSide == "BUY") ? mat_eng::OrderRequest::BUY : mat_eng::OrderRequest::SELL );
+    req.set_side( (sSide == "BUY") ? mat_eng::BUY : mat_eng::SELL );
     req.set_order_type( (sType == "LIMIT") ? mat_eng::OrderRequest::LIMIT : mat_eng::OrderRequest::MARKET );
     req.set_price(price);
     req.set_scale(scale);
