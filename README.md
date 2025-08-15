@@ -23,6 +23,7 @@ git clone https://github.com/microsoft/vcpkg C:\vcpkg
 C:\vcpkg\bootstrap-vcpkg.bat
 C:\vcpkg\vcpkg.exe install protobuf:x64-windows grpc:x64-windows
 C:\vcpkg\vcpkg.exe install sqlitecpp
+C:\vcpkg\vcpkg.exe install Gtest
 
 ### 3 Configure Your CMake Project (with vcpkg Toolchain)
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
@@ -106,6 +107,15 @@ _Output:_
 _Output:_
 ```
 [client] accepted order_id=2
+```
+
+---
+
+# Tests
+
+**Run the unit tests:**
+```bash
+ctest --test-dir build -C Release -V
 ```
 
 ---

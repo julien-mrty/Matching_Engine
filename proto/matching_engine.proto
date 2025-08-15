@@ -8,6 +8,11 @@ enum Side {
   SELL = 2;
 }
 
+enum OrderType { 
+  LIMIT = 0; 
+  MARKET = 1; 
+}
+
 message Order {
   string order_id = 1;
   string client_id = 2;
@@ -32,7 +37,6 @@ service MatchingEngine {
 message OrderRequest {
   string client_id = 1;
   string symbol = 2;
-  enum OrderType { LIMIT = 0; MARKET = 1; }
   OrderType order_type = 3;
   Side side = 4;
   int64 price = 5; // scaled integer

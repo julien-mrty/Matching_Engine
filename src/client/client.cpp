@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
     req.set_client_id(clientId);
     req.set_symbol(symbol);
     req.set_side( (sSide == "BUY") ? mat_eng::BUY : mat_eng::SELL );
-    req.set_order_type( (sType == "LIMIT") ? mat_eng::OrderRequest::LIMIT : mat_eng::OrderRequest::MARKET );
+    req.set_order_type( (sType == "LIMIT") ? mat_eng::LIMIT : mat_eng::MARKET );
     req.set_price(price);
     req.set_scale(scale);
     req.set_quantity(qty);
