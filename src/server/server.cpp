@@ -2,7 +2,7 @@
 #include "matching_engine.grpc.pb.h"
 #include "matching_engine.pb.h"
 #include "domain/order.hpp"
-#include "storage/storage.h"
+#include "storage/storage.hpp"
 #include "domain/side.hpp"
 
 #include <unordered_map>
@@ -51,7 +51,7 @@ public:
         };
 
         // --- log ----------------------------------------------------------------
-        std::cout << "[SubmitOrder] ================================================================= New Order" << std::endl
+        std::cout << "[SERVER] [SubmitOrder] ============================================================= New Order" << std::endl
                 << " client_id=" << req->client_id()
                 << " symbol="    << req->symbol()
                 << " side="      << side_str()
@@ -67,24 +67,24 @@ public:
         if (req->symbol().empty()) {
             resp->set_success(false);
             resp->set_error_message("symbol is required");
-            std::cerr << "[SubmitOrder][reject] reason=missing_symbol" << std::endl;
+            std::cerr << "[SERVER] [SubmitOrder][reject] reason=missing_symbol" << std::endl;
             return grpc::Status::OK;
         }
         if (req->quantity() <= 0) {
             resp->set_success(false);
             resp->set_error_message("quantity must be > 0");
-            std::cerr << "[SubmitOrder][reject] reason=non_positive_qty qty=" << req->quantity() << std::endl;
+            std::cerr << "[SERVER] [SubmitOrder][reject] reason=non_positive_qty qty=" << req->quantity() << std::endl;
             return grpc::Status::OK;
         }
         if (req->order_type() == mat_eng::OrderRequest::LIMIT && req->price() <= 0) {
             resp->set_success(false);
             resp->set_error_message("price must be > 0 for LIMIT");
-            std::cerr << "[SubmitOrder][reject] reason=non_positive_price price=" << req->price() << std::endl;
+            std::cerr << "[SERVER] [SubmitOrder][reject] reason=non_positive_price price=" << req->price() << std::endl;
             return grpc::Status::OK;
         }
 
         const auto order_id = gen_order_id();
-        std::cout << "[SubmitOrder] oid=" << order_id << " validated" << std::endl;
+        std::cout << "[SERVER] [SubmitOrder] oid=" << order_id << " validated" << std::endl;
 
         // --- Order creation -----------------------------------------------------------
         Order new_order = Order::FromRaw(
@@ -109,14 +109,14 @@ public:
         resp->set_success(ok);
         if (!ok) {
             resp->set_error_message("DB insert failed");
-            std::cerr << "[SubmitOrder][error] oid=" << order_id << " outcome=db_insert_failed" << std::endl;
+            std::cerr << "[SERVER] [SubmitOrder][error] oid=" << order_id << " outcome=db_insert_failed" << std::endl;
         } else {
-            std::cout << "[SubmitOrder][ok] oid=" << order_id << " inserted" << std::endl;
+            std::cout << "[SERVER] [SubmitOrder][ok] oid=" << order_id << " inserted" << std::endl;
         }
 
         const auto dur_us = std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::steady_clock::now() - t0).count();
-        std::cout << "[SubmitOrder] oid=" << order_id << " done in " << dur_us << "us" << std::endl;
+        std::cout << "[SERVER] [SubmitOrder] oid=" << order_id << " done in " << dur_us << "us" << std::endl;
 
         return grpc::Status::OK;
     }
@@ -183,16 +183,16 @@ int main(int argc, char** argv) {
         std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 
         if (!server) {
-            std::cerr << "[server] ERROR: BuildAndStart() returned null\n";
+            std::cerr << "[SERVER] ERROR: BuildAndStart() returned null\n";
             return 1;
         }
                 
         if (selected_port == 0) {
-            std::cerr << "[server] ERROR: failed to bind " << addr << " (in use or permission issue)\n";
+            std::cerr << "[SERVER] ERROR: failed to bind " << addr << " (in use or permission issue)\n";
             return 1;
         }
 
-        std::cout << "[server] listening on " << addr << " ; db=" << db_file.string() << "\n";
+        std::cout << "[SERVER] listening on " << addr << " ; db=" << db_file.string() << "\n";
 
         std::signal(SIGINT,  on_signal);
         std::signal(SIGTERM, on_signal);
@@ -207,10 +207,10 @@ int main(int argc, char** argv) {
         return 0;
 
   } catch (const SQLite::Exception& e) {
-    std::cerr << "[server] SQLite error: " << e.what() << "\n";
+    std::cerr << "[SERVER] SQLite error: " << e.what() << "\n";
     return 2;
   } catch (const std::exception& e) {
-    std::cerr << "[server] Fatal error: " << e.what() << "\n";
+    std::cerr << "[SERVER] Fatal error: " << e.what() << "\n";
     return 3;
   }
 }

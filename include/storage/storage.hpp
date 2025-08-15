@@ -12,7 +12,6 @@ struct FillRow {
   std::string order_id;
   std::string symbol;
   int64_t     fill_price;     // scaled int
-  int32_t     scale;
   int32_t     fill_quantity;
   int64_t     event_ts;       // epoch ms
 };
