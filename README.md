@@ -86,12 +86,12 @@ Parallel build (uses all cores).
 
 # Run (Two Terminals)
 
-**Terminal 1 — server:**
+**Terminal — server:**
 ```bash
 ./build/Release/server 0.0.0.0:50051
 ```
 
-**Terminal 2 — client:**
+**Terminal — client:**
 ```bash
 ./build/Release/client.exe localhost:50051 C1 SYM BUY LIMIT 10050 2 10
 ```

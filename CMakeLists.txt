@@ -5,6 +5,7 @@ project(matching_engine LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# --- Protobuf/gRPC ---
 # 1) Find packages provided by vcpkg (you pass the toolchain at configure time)
 find_package(Protobuf CONFIG REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
@@ -38,14 +39,18 @@ add_library(proto_lib STATIC
   ${GEN}/matching_engine.pb.cc
   ${GEN}/matching_engine.grpc.pb.cc
 )
+
+# Publish generated headers to dependents
 target_include_directories(proto_lib PUBLIC ${GEN})
 # link against the vcpkg-provided imported targets
 target_link_libraries(proto_lib PUBLIC gRPC::grpc++ protobuf::libprotobuf)
 
+# --- server ---
 # 5) Server and client executables that link the generated library
 add_executable(server src/server/server.cpp)
 target_link_libraries(server PRIVATE proto_lib storage gRPC::grpc++ protobuf::libprotobuf)
 
+# --- client ---
 add_executable(client src/client/client.cpp)
 target_link_libraries(client PRIVATE proto_lib storage gRPC::grpc++ protobuf::libprotobuf)
 
@@ -60,12 +65,11 @@ target_include_directories(storage
   PUBLIC ${CMAKE_SOURCE_DIR}/include
 )
 target_compile_features(storage PUBLIC cxx_std_20)
-target_link_libraries(storage
-  PRIVATE SQLiteCpp
+target_link_libraries(storage PRIVATE proto_lib SQLiteCpp
   # If your toolchain complains about unresolved sqlite3 symbols, also add:
   # PRIVATE unofficial::sqlite3::sqlite3
 )
 
-# Link storage into your binaries
-target_link_libraries(server PRIVATE storage)
-target_link_libraries(client PRIVATE storage)
+# Make include/ visible to server/client explicitly
+target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/include)
