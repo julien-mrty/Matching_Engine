@@ -20,8 +20,9 @@ Using vcpkg avoids common Windows issues: missing headers, wrong ABIs, and CMake
 
 ### 2 Install vcpkg + Libraries
 ```bash
-git clone https://github.com/microsoft/vcpkg C:\vcpkg
-C:\vcpkg\bootstrap-vcpkg.bat
+git clone https://github.com/microsoft/vcpkg 
+cd C:\vcpkg
+C:\vcpkg\bootstrap-vcpkg.bat -disableMetrics
 C:\vcpkg\vcpkg.exe install protobuf:x64-windows grpc:x64-windows
 C:\vcpkg\vcpkg.exe install sqlitecpp
 ```
