@@ -19,11 +19,14 @@ Using vcpkg avoids common Windows issues: missing headers, wrong ABIs, and CMake
 - Git, PowerShell
 
 ### 2 Install vcpkg + Libraries
-git clone https://github.com/microsoft/vcpkg C:\vcpkg
-C:\vcpkg\bootstrap-vcpkg.bat
+```bash
+git clone https://github.com/microsoft/vcpkg 
+cd C:\vcpkg
+C:\vcpkg\bootstrap-vcpkg.bat -disableMetrics
 C:\vcpkg\vcpkg.exe install protobuf:x64-windows grpc:x64-windows
 C:\vcpkg\vcpkg.exe install sqlitecpp
 C:\vcpkg\vcpkg.exe install Gtest
+```
 
 ### 3 Configure Your CMake Project (with vcpkg Toolchain)
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
