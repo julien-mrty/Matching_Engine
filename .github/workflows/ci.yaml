@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: windows-2025
+
+    steps:
+      # 1Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Install vcpkg and dependencies
+      - name: Install vcpkg
+        run: |
+          C:/vcpkg/vcpkg.exe install protobuf:x64-windows grpc:x64-windows sqlitecpp:x64-windows gtest:x64-windows
+
+      # Configure CMake
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DCMAKE_BUILD_TYPE=Release
+
+      # Build project (all targets, including proto_lib, server, client, tests)
+      - name: Build all
+        run: cmake --build build --config Release -- /m
+
+      # Run tests using CTest
+      - name: Run tests
+        run: ctest --test-dir build -C Release --output-on-failure
