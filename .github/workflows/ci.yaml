@@ -45,3 +45,8 @@ jobs:
       # Run tests using CTest
       - name: Run tests
         run: ctest --test-dir build -C Release --output-on-failure
+
+      # Run E2E smoke test
+      - name: Run smoke E2E test
+        shell: pwsh
+        run: ./scripts/smoke.ps1
