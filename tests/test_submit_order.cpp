@@ -24,6 +24,7 @@ struct ServerFixture : ::testing::Test {
   int selected_port = 0;
   std::string db_path;
   std::unique_ptr<mat_eng::MatchingEngine::Stub> stub;
+  std::unique_ptr<MatchingEngineServiceImpl> service;
 
   void SetUp() override {
     db_path = temp_db_path();
@@ -31,7 +32,7 @@ struct ServerFixture : ::testing::Test {
     std::remove(db_path.c_str());
 
     // Construct your service with db_path (adjust ctor as in your server)
-    auto service = std::make_unique<MatchingEngineServiceImpl>(db_path);
+    service = std::make_unique<MatchingEngineServiceImpl>(db_path);
 
     grpc::ServerBuilder builder;
     builder.RegisterService(service.get());
@@ -57,7 +58,7 @@ TEST_F(ServerFixture, SubmitOrder_NormalizesAndPersists) {
   req.set_client_id("C1");
   req.set_symbol("SYM");
   req.set_order_type(mat_eng::LIMIT);
-  req.set_side(mat_eng::BUY);       // top-level enum after your fix
+  req.set_side(mat_eng::BUY);       // top-level enum after fix
   req.set_price(10050);
   req.set_scale(8);
   req.set_quantity(10);
@@ -71,7 +72,7 @@ TEST_F(ServerFixture, SubmitOrder_NormalizesAndPersists) {
 
   // Open DB and assert price_q4
   SQLite::Database db(db_path, SQLite::OPEN_READONLY);
-  SQLite::Statement stmt(db, "SELECT price_q4 FROM orders WHERE order_id=?");
+  SQLite::Statement stmt(db, "SELECT price FROM orders WHERE order_id=?");
   stmt.bind(1, resp.order_id());
   ASSERT_TRUE(stmt.executeStep());
   auto price_q4 = stmt.getColumn(0).getInt64();

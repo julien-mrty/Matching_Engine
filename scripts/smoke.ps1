@@ -9,8 +9,7 @@ $server = Start-Process -FilePath $ServerExe -PassThru
 Start-Sleep -Milliseconds 800
 
 function Run-Case($side, $type, $price, $scale, $qty) {
-  $args = "$Addr C1 SYM $side $type $price $scale $qty"
-  $out = & $ClientExe $args
+  $out = & $ClientExe $Addr C1 SYM $side $type $price $scale $qty
   if ($LASTEXITCODE -ne 0) {
     Write-Error "Client failed: $out"
     exit 1

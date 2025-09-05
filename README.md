@@ -113,7 +113,7 @@ _Output:_
 
 # Tests
 
-**Run the unit tests:**
+**Run the unit and integration tests:**
 ```bash
 ctest --test-dir build -C Release -V
 ```
