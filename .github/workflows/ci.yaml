@@ -15,8 +15,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # 2. Setup vcpkg cache for binary artifacts
+      - name: Cache vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: C:/Users/runneradmin/AppData/Local/vcpkg/archives
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
       # Install vcpkg and dependencies
-      - name: Install vcpkg
+      - name: Install dependencies with vcpkg
         run: |
           C:/vcpkg/vcpkg.exe install protobuf:x64-windows grpc:x64-windows sqlitecpp:x64-windows gtest:x64-windows
 
@@ -26,6 +35,7 @@ jobs:
           cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
             -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
             -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DVCPKG_BINARY_SOURCES="clear;default,readwrite" `
             -DCMAKE_BUILD_TYPE=Release
 
       # Build project (all targets, including proto_lib, server, client, tests)
